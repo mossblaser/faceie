@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "faceie"
+version = "0.0.1"
+license = {file= "LICENSE"}
+dependencies = [
+    "numpy",
+    "pillow",
+]
+
+[project.optional-dependencies]
+convert = [
+    "torch",
+    "torchvision",
+]
+
+[project.scripts]
+faceie-convert-weights-file = "faceie.scripts.convert_weights_file:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.mypy]
+plugins = "numpy.typing.mypy_plugin"
