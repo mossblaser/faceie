@@ -4,7 +4,7 @@ import numpy as np
 
 import torch
 
-from faceie.nn import conv2d
+from faceie.nn import conv2d, prelu, max_pool_2d, softmax
 
 
 def test_conv2d() -> None:
@@ -53,3 +53,66 @@ def test_conv2d() -> None:
     #
     # NB higher tollerance due to float32 precision
     assert np.allclose(out, torch_out.numpy(), atol=1e-6)
+
+
+def test_prelu() -> None:
+    num_channels = 10
+    
+    # Arbitrary choice except for the axis of choice being at index 1 which is
+    # assumed by PyTorch.
+    input_shape = (3, num_channels, 100, 200)  
+    
+    torch_prelu = torch.nn.PReLU(num_channels)
+    with torch.no_grad():
+        # Randomise weights
+        torch_prelu.weight[:] = torch.rand(*torch_prelu.weight.shape) * 2
+    
+    # Get model answer
+    in_tensor = torch.randn(*input_shape)
+    with torch.no_grad():
+        out_tensor = torch_prelu(in_tensor)
+    
+    # Convert types
+    input = in_tensor.numpy()
+    parameters = torch_prelu.weight.detach().numpy()
+    
+    out = prelu(input, parameters, axis=1)
+    
+    assert np.allclose(out, out_tensor.numpy())
+
+
+def test_max_pool_2d() -> None:
+    ar = np.array(
+        [
+            [1, 2, 3, 4, 5, 6],
+            [7, 8, 9, 0, 1, 2],
+            [3, 4, 5, 6, 7, 8],
+            [9, 0, 1, 2, 3, 4],
+        ]
+    )
+    
+    assert np.array_equal(
+        max_pool_2d(ar, 2, 3),
+        np.array(
+            [
+                [9, 6],
+                [9, 8],
+            ]
+        ),
+    )
+
+
+@pytest.mark.parametrize("dim", [0, 1, -1, -2])
+def test_softmax(dim: int) -> None:
+    np.random.seed(0)
+    x = np.random.uniform(-10, 10, size=(3, 3))
+
+    torch_softmax = torch.nn.Softmax(dim)
+    exp = torch_softmax(torch.tensor(x)).detach().numpy()
+
+    actual = softmax(x, axis=dim)
+
+    print(exp)
+    print(actual)
+
+    assert np.allclose(actual, exp)
