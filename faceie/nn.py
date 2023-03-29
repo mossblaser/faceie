@@ -5,6 +5,8 @@ A collection of generic deep neural network functions.
 import numpy as np
 from numpy.typing import NDArray
 
+from math import ceil, floor
+
 
 def conv2d(img: NDArray, weights: NDArray, biases: NDArray) -> NDArray:
     """
@@ -112,67 +114,183 @@ def prelu(x: NDArray, parameters: NDArray, axis: int) -> NDArray:
     )
 
 
-def max_pool_2d(x: NDArray, block_height: int, block_width: int) -> NDArray:
+def max_pool_2d(
+    x: NDArray,
+    kernel: int | tuple[int, int],
+    stride: int | tuple[int, int],
+    ceil_mode: bool = True,
+    out: NDArray | None = None,
+) -> NDArray:
     """
-    Apply 2D 'max pooling' in which two dimensions of the input are reduced in
-    size by breaking them into blocks and taking the maximum value in each
-    block.
-    
-    If the input is an array::
-    
-        +-----------+
-        |           |
-        |           |
-        |           |
-        +-----------+
-    
-    It is broken up into blocks of size block_height and block_width::
-    
-        +---+---+---+
-        |   |   |   |
-        +---+---+---+
-        |   |   |   |
-        +---+---+---+
-    
-    The maximum value within each block is then computed and returned as a new
-    (smaller) 2D array.
+    Apply 2D 'max pooling' convolution filter in which the input is convolved
+    using the 'max' function acting over kernel-sized regions.
     
     Parameters
     ==========
     x : array (..., in_height, in_width)
         The input array. The final two dimensions are used as 2D coordinates.
         They must be exact multiples of block_height and block_width.
-    block_height : int
-    block_width : int
-        The size of the blocks the input will be divided into.
+    kernel : int or (int, int)
+        The kernel height and width.
+    stride : int or (int, int)
+        The step size.
+    ceil_mode : bool
+        If True, add -inf padding to the right and bottom edges of the input
+        when necessary to ensure that all input values are represented in the
+        output.
+        
+        For some combinations of input size, kernel and stride, it is possible
+        for some input values to be omitted from processing. The illustration
+        below shows the regions of an input processed by a kernel::
+        
+            +---+---+---+-+   ceil_mode == False
+            |   |   |   |X|
+            +---+---+---+X|   X = values not processed by any kernel
+            |   |   |   |X|
+            +---+---+---+X|
+            +XXXXXXXXXXXXX+
+        
+        Here, because the kernel and stride do not exactly divide the input,
+        some inputs at the bottom and right sides are not processed by any
+        kernels and are effectively ignored. This is the behaviour when
+        ``ceil_mode`` is False.
+        
+        When ``ceil_mode`` is True, the input is effectively padded with -inf
+        to enable an extra kernel to fit, capturing the edge-most values::
+        
+            +---+---+---+---+   ceil_mode == True
+            |   |   |   | PP|
+            +---+---+---+---+   P = padding '-inf' values added to input
+            |   |   |   | PP|
+            +---+---+---+---+
+            |   |   |   | PP|
+            +PPP+PPP+PPP+PPP+
+        
+        The result is that the output size grows by one and all input values
+        are processed by at least one kernel. (Unless of course the stride is
+        larger than the kernel!)
+        
+        .. note::
+        
+            The case where the stride is larger than the kernel is considered
+            degenerate in that inputs will be ignored between kernels which fit
+            in the input without padding. In this case, ceil_mode will continue
+            to expand the output
+    
+    out: NDArray or None
+        If given, an array into which to write the output (see return value for
+        expected size). Otherwise, a new array will be allocated.
     
     Returns
     =======
-    array (..., in_height / block_height, in_width / block_width)
-        The maxima for each input block.
+    array (..., out_height, out_width)
+        The output of the convolution.
+        
+        The output dimensions are:
+        
+            out_height = ceil((max(0, height - kernel[0])/stride[0]) + 1)
+            out_width = ceil((max(0, width - kernel[1])/stride[1]) + 1)
+        
+        (Replace 'ceil' with 'floor' if ceil_mode is False.)
     """
-    # Get a windowed view of 'x's final two dimensions
+    # Expand kernel/stride size shorthands
+    if isinstance(kernel, int):
+        kernel = (kernel, kernel)
+    if isinstance(stride, int):
+        stride = (stride, stride)
+    
+    # If the kernel is larger than the input then there are enough tricks
+    # needed below to make it not worth handling this edge-case until I
+    # actually need to...
+    if kernel[0] > x.shape[-2]:
+        raise ValueError("Kernel taller than input.")
+    if kernel[1] > x.shape[-1]:
+        raise ValueError("Kernel wider than input.")
+    
+    # We don't have any sensible handling for when ceil_mode is used with a
+    # kernel smaller than the step -- what happens in this case is somewhat
+    # ill-defined anyway...
+    if ceil_mode:
+        if stride[0] > kernel[0]:
+            raise ValueError("Stride taller than kernel.")
+        if stride[1] > kernel[1]:
+            raise ValueError("Stride wider than kernel.")
+    
+    # Get a windowed view of 'x's final two dimensions.
+    #
+    # NB: Regardless of the ceil_mode setting, this includes only 'complete'
+    # kernel inputs where no padding is required. Padded cases are handled
+    # specially later.
+    #
+    # windowed.shape == (..., wh, ww, kernel[0], kernel[1])
     windowed = np.lib.stride_tricks.sliding_window_view(
         x,
-        x.shape[:-2] + (block_height, block_width),
-    )
-    # Drop extra windowing dimensions corresponding to the non-coordinate axes
-    for _ in range(x.ndim - 2):
-        windowed = windowed.squeeze(0)
+        window_shape=kernel,
+        axis=(-2, -1),
+    )  # type: ignore
+    # XXX: Unclear why MyPy doesn't like the type of 'x' above here...
     
-    # windowed.shape == (wh, ww, ..., block_height, block_width)
-    
-    # Since sliding_window_view returns all possible overlapping windows, we
-    # want to pull out just the non-overlapping set
+    # Pull out required strides (again ignoring 'incomplete' windows)
     #
-    # (out_height, out_width, ..., block_height, block_width)
-    windowed = windowed[::block_height, ::block_width, ...]
+    # (..., out_height_complete, out_width_complete, kernel[0], kernel[1])
+    windowed = windowed[..., ::stride[0], ::stride[1], :, :]
     
-    # We now perform max pooling
-    out = windowed.max(axis=(-2, -1))  # (out_height, out_width, ...)
+    # Create the output array (including an extra row or column as needed
+    # when ceil_mode is True).
+    #
+    # (..., out_height, out_width)
+    rounding_mode = ceil if ceil_mode else floor
+    out_height = rounding_mode((max(0, x.shape[-2] - kernel[0]) / stride[0]) + 1)
+    out_width = rounding_mode((max(0, x.shape[-1] - kernel[1]) / stride[1]) + 1)
+    if out is None:
+        out = np.zeros(shape=(x.shape[:-2] + (out_height, out_width)), dtype=x.dtype)
+    else:
+        # Sanity check user provided correctly shaped output array
+        assert out.shape == x.shape[:-2] + (out_height, out_width)
     
-    # And finally move the window dimensions to the end
-    out = np.moveaxis(out, (0, 1), (-2, -1))  # (..., out_height, out_width)
+    # We now perform max pooling for all complete kernels
+    np.max(
+        windowed,
+        axis=(-2, -1),
+        out=out[..., :windowed.shape[-4], :windowed.shape[-3]],
+    )  # (..., out_height_complete, out_width_complete)
+    
+    # Now we perform max pooling for any overspilled kernels when required in
+    # ceil_mode
+    if ceil_mode:
+        # Work out how many rows/columns of the input have not been processed
+        stragglers_bottom = x.shape[-2] - (((windowed.shape[-4] - 1) * stride[0]) + kernel[0])
+        stragglers_right = x.shape[-1] - (((windowed.shape[-3] - 1) * stride[1]) + kernel[1])
+        
+        # Process straggler rows and columns which were not processed by any
+        # full-sized kernel.
+        if stragglers_bottom:
+            max_pool_2d(
+                x[..., -stragglers_bottom:, :],
+                kernel=(stragglers_bottom, kernel[1]),
+                stride=stride,
+                ceil_mode=False,
+                out=out[..., -1:, :windowed.shape[-3]],
+            )
+        
+        if stragglers_right:
+            max_pool_2d(
+                x[..., :, -stragglers_right:],
+                kernel=(kernel[0], stragglers_right),
+                stride=stride,
+                ceil_mode=False,
+                out=out[..., :windowed.shape[-4], -1:],
+            )
+        
+        if stragglers_bottom and stragglers_right:
+            np.max(
+                x[..., -stragglers_bottom:, -stragglers_right:],
+                axis=(-2, -1),
+                out=out[..., -1, -1]
+            )
+    else:
+        # Sanity check when ceil_mode is False
+        assert out.shape == windowed.shape[:-2]
     
     return out
 
