@@ -8,6 +8,12 @@ from numpy.typing import NDArray
 from math import ceil, floor
 
 
+def linear(x: NDArray, weights: NDArray, biases: NDArray) -> NDArray:
+    """
+    A simple linear/dense layer: (x @ weights) + biases
+    """
+    return (x @ weights) + biases
+
 def conv2d(img: NDArray, weights: NDArray, biases: NDArray) -> NDArray:
     """
     Perform 2D convolution on the provided image using the provided kernel
@@ -188,8 +194,8 @@ def max_pool_2d(
         
         The output dimensions are:
         
-            out_height = ceil((max(0, height - kernel[0])/stride[0]) + 1)
-            out_width = ceil((max(0, width - kernel[1])/stride[1]) + 1)
+            out_height = ceil(((height - kernel[0])/stride[0]) + 1)
+            out_width = ceil(((width - kernel[1])/stride[1]) + 1)
         
         (Replace 'ceil' with 'floor' if ceil_mode is False.)
     """
@@ -240,8 +246,8 @@ def max_pool_2d(
     #
     # (..., out_height, out_width)
     rounding_mode = ceil if ceil_mode else floor
-    out_height = rounding_mode((max(0, x.shape[-2] - kernel[0]) / stride[0]) + 1)
-    out_width = rounding_mode((max(0, x.shape[-1] - kernel[1]) / stride[1]) + 1)
+    out_height = rounding_mode(((x.shape[-2] - kernel[0]) / stride[0]) + 1)
+    out_width = rounding_mode(((x.shape[-1] - kernel[1]) / stride[1]) + 1)
     if out is None:
         out = np.zeros(shape=(x.shape[:-2] + (out_height, out_width)), dtype=x.dtype)
     else:
@@ -258,10 +264,16 @@ def max_pool_2d(
     # Now we perform max pooling for any overspilled kernels when required in
     # ceil_mode
     if ceil_mode:
-        # Work out how many rows/columns of the input have not been processed
-        stragglers_bottom = x.shape[-2] - (((windowed.shape[-4] - 1) * stride[0]) + kernel[0])
-        stragglers_right = x.shape[-1] - (((windowed.shape[-3] - 1) * stride[1]) + kernel[1])
+        # When some partial kernels are required, find their size
+        bottommost_kernel_end = ((out.shape[-2] - 1) * stride[0]) + kernel[0]
+        rightmost_kernel_end = ((out.shape[-1] - 1) * stride[1]) + kernel[1]
         
+        stragglers_bottom = stragglers_right = 0
+        if bottommost_kernel_end > x.shape[-2]:
+            stragglers_bottom = x.shape[-2] - (bottommost_kernel_end - kernel[0])
+        if rightmost_kernel_end > x.shape[-1]:
+            stragglers_right = x.shape[-1] - (rightmost_kernel_end - kernel[1])
+            
         # Process straggler rows and columns which were not processed by any
         # full-sized kernel.
         if stragglers_bottom:

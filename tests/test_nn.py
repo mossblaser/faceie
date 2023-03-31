@@ -82,164 +82,35 @@ def test_prelu() -> None:
     assert np.allclose(out, out_tensor.numpy(), atol=1e-6)
 
 
-class TestMaxPool2D:
-    
-    @pytest.mark.parametrize("ceil_mode", [True, False])
-    def test_perfect_fit_kernel_and_stride(self, ceil_mode: bool) -> None:
-        ar = np.array(
-            [
-                [1, 2, 3, 4, 5, 6],
-                [7, 8, 9, 0, 1, 2],
-                [3, 4, 5, 6, 7, 8],
-                [9, 0, 1, 2, 3, 4],
-            ],
-        )
-        
-        assert np.array_equal(
-            max_pool_2d(ar, (2, 3), (2, 3), ceil_mode=ceil_mode),
-            np.array(
-                [
-                    [9, 6],
-                    [9, 8],
-                ]
-            ),
-        )
-    
-    def test_not_ceil_mode_truncates(self) -> None:
-        ar = np.array(
-            [
-                [1, 2, 3, 4, 5],
-                [7, 8, 9, 0, 1],
-                [3, 4, 5, 6, 7],
-            ],
-        )
-        
-        assert np.array_equal(
-            max_pool_2d(ar, (2, 3), (2, 3), ceil_mode=False),
-            np.array(
-                [
-                    [9],
-                ]
-            ),
-        )
-    
-    @pytest.mark.parametrize(
-        "description, input, exp, kernel, stride",
-        [
-            # Square kernel
-            (
-                "Stride 1, square kernel",
-                np.array(
-                    [
-                        [1, 2, 3, 4, 5],
-                        [6, 7, 8, 9, 1],
-                    ],
-                ),
-                np.array(
-                    [
-                        [7, 8, 9, 9],
-                    ]
-                ),
-                (2, 2),
-                (1, 1),
-            ),
-            (
-                "Stride 1, rectangular kernel",
-                np.array(
-                    [
-                        [1, 2, 3, 4, 5],
-                        [6, 7, 8, 9, 1],
-                    ],
-                ),
-                np.array(
-                    [
-                        [2, 3, 4, 5],
-                        [7, 8, 9, 9],
-                    ]
-                ),
-                (1, 2),
-                (1, 1),
-            ),
-            (
-                "Stride 2, kernel 3, sizes work out, no padding required",
-                np.array(
-                    [
-                        [1, 2, 3, 4, 5],
-                    ],
-                ),
-                np.array(
-                    [
-                        [3, 5],
-                    ]
-                ),
-                (1, 3),
-                (1, 2),
-            ),
-            (
-                "Stride 2, kernel 3, sizes don't work out, padding required",
-                np.array(
-                    [
-                        [1, 2, 3, 4, 5, 6],
-                    ],
-                ),
-                np.array(
-                    [
-                        [3, 5, 6],
-                    ]
-                ),
-                (1, 3),
-                (1, 2),
-            ),
-            (
-                "Stride 3, kernel 3, edges and corner padding required",
-                np.array(
-                    [
-                        [1, 2, 3, 4, 5],
-                        [6, 7, 8, 9, 8],
-                        [7, 6, 5, 4, 3],
-                        [2, 1, 0, 1, 2],
-                    ],
-                ),
-                np.array(
-                    [
-                        [8, 9],
-                        [2, 2],
-                    ]
-                ),
-                (3, 3),
-                (3, 3),
-            ),
-        ]
-    )
-    @pytest.mark.parametrize("transpose", [False, True])
-    @pytest.mark.parametrize("extra_dims", [False, True])
-    def test_ceil_mode(
-        self,
-        description: str,
-        input: NDArray,
-        exp: NDArray,
-        kernel: tuple[int, int],
-        stride: tuple[int, int],
-        transpose: bool,
-        extra_dims: bool,
-    ) -> None:
-        if transpose:
-            input = np.swapaxes(input, -2, -1)
-            exp = np.swapaxes(exp, -2, -1)
-            kernel = kernel[::-1]
-            stride = stride[::-1]
-        
-        if extra_dims:
-            input = np.stack((input, input * 2))
-            exp = np.stack((exp, exp * 2))
-        
-        print(f"{input=}")
-        print(f"{kernel=}")
-        print(f"{stride=}")
-        out = max_pool_2d(input, kernel=kernel, stride=stride, ceil_mode=True)
-        print(f"{out=}")
-        print(f"{exp=}")
-        assert np.array_equal(out, exp), description
+@pytest.mark.parametrize("ceil_mode", [False, True])
+@pytest.mark.parametrize("square", [False, True])
+def test_max_pool_2d(ceil_mode: bool, square: bool) -> None:
+    for stride in range(1, 5):
+        for kernel in range(stride, 5):
+            
+            torch_max_pool_2d = torch.nn.MaxPool2d(
+                kernel_size=kernel if square else (kernel, kernel + 1),
+                stride=stride if square else (stride, stride + 1),
+                ceil_mode=ceil_mode,
+            )
+            
+            # Work through all a one-hot 2D arrays of the following size
+            w = 8
+            h = 6
+            for i in range(w * h):
+                ar = np.zeros(w * h, dtype=float).reshape(1, 1, h, w)
+                ar.flat[i] = 1.0
+                
+                out = max_pool_2d(
+                    ar,
+                    kernel=kernel if square else (kernel, kernel + 1),
+                    stride=stride if square else (stride, stride + 1),
+                    ceil_mode=ceil_mode,
+                )
+                with torch.no_grad():
+                    exp_out = torch_max_pool_2d(torch.tensor(ar)).numpy()
+                
+                assert np.array_equal(out, exp_out), f"{out=}\n{exp_out=}"
 
 
 @pytest.mark.parametrize("dim", [0, 1, -1, -2])
