@@ -131,6 +131,12 @@ def max_pool_2d(
     Apply 2D 'max pooling' convolution filter in which the input is convolved
     using the 'max' function acting over kernel-sized regions.
     
+    .. warning::
+    
+        This function is significantly slower than similar functions in (e.g.)
+        PyTorch due to numpy's apparent lack of SIMD or multicore support in
+        its 'amax' function.
+    
     Parameters
     ==========
     x : array (..., in_height, in_width)
@@ -255,7 +261,7 @@ def max_pool_2d(
         assert out.shape == x.shape[:-2] + (out_height, out_width)
     
     # We now perform max pooling for all complete kernels
-    np.max(
+    np.amax(
         windowed,
         axis=(-2, -1),
         out=out[..., :windowed.shape[-4], :windowed.shape[-3]],
