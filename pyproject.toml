@@ -18,7 +18,7 @@ convert = [
 ]
 
 [project.scripts]
-faceie-convert-weights-file = "faceie.scripts.convert_weights_file:main"
+faceie-convert-mtcnn-weights = "faceie.scripts.convert_mtcnn_weights:main"
 
 [tool.setuptools]
 include-package-data = true
