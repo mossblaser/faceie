@@ -10,7 +10,7 @@ import numpy as np
 
 import pickle
 
-from faceie.model.mtcnn import (
+from faceie.mtcnn.model import (
     PNetWeights,
     RNetWeights,
     ONetWeights,
