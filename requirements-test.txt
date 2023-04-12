@@ -1,3 +1,4 @@
 pytest
 mypy
 types-pillow
+git+https://github.com/timesler/facenet-pytorch@78ec3ec#facenet-pytorch
