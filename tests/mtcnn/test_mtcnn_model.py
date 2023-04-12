@@ -11,7 +11,7 @@ import torch
 from faceie.mtcnn.model import p_net, r_net, o_net
 from faceie.mtcnn.detect_faces import resolve_p_net_bounding_boxes, image_to_array
 
-import facenet_pytorch.models.mtcnn
+import facenet_pytorch.models.mtcnn  # type: ignore
 
 
 TEST_IMAGE_DIR = Path(__file__).parent

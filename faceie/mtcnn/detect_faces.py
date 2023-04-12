@@ -246,7 +246,7 @@ def output_proposals(
     pyramid: ImagePyramid,
     bounding_boxes: NDArray,
     probability_threshold: float = 0.7,
-) -> tuple[NDArray, NDArray]:
+) -> tuple[NDArray, NDArray, NDArray]:
     """
     Given a series of potential faces, return a final (output) probability,
     bounding box and (optional) set of facial landmarks.

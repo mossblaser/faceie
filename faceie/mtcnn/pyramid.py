@@ -87,7 +87,7 @@ class ImagePyramid:
     
     def extract(
         self,
-        crop: tuple[int, int, int, int], 
+        crop: tuple[float, float, float, float], 
         size: tuple[int, int] | None = None,
     ) -> Image.Image:
         """
@@ -104,8 +104,8 @@ class ImagePyramid:
             the native size is assumed.
         """
         x1, y1, x2, y2 = crop
-        iw = x2 - x1
-        ih = y2 - y1
+        iw = round(x2 - x1)
+        ih = round(y2 - y1)
         
         if size is None:
             size = (iw, ih)

@@ -64,7 +64,7 @@ class TestImagePyramid:
         p = ImagePyramid(Image.new("RGB", (128, 64)), 12)
         assert p.closest_level(downscale_factor) == exp
     
-    def test_scale_between(self) -> None:
+    def test_extract(self) -> None:
         pixels = np.zeros((128, 256, 3), dtype=np.uint8)
         pixels[24:, 48:] = 0xFF
         im = Image.fromarray(pixels, mode="RGB")
