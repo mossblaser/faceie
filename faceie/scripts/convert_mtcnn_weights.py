@@ -44,9 +44,9 @@ def main():
         nargs=2,
         metavar=("input", "output"),
     )
-    
+
     args = parser.parse_args()
-    
+
     ################################################################################
 
     if args.p_net is not None:
@@ -99,8 +99,10 @@ def main():
         # NB: Numpy linear transform weights stored transposed by PyTorch
         dense4_weight = state_dict["dense4.weight"].numpy()  # (128, 3*3*64)
         dense4_weight = dense4_weight.reshape(128, 3, 3, 64)  # (128, 3, 3, 64)
-        dense4_weight = np.moveaxis(dense4_weight, (1, 2, 3), (3, 2, 1))  # (128, 64, 3, 3)
-        dense4_weight = dense4_weight.reshape(128, 64*3*3)  # (128, 64*3*3)
+        dense4_weight = np.moveaxis(
+            dense4_weight, (1, 2, 3), (3, 2, 1)
+        )  # (128, 64, 3, 3)
+        dense4_weight = dense4_weight.reshape(128, 64 * 3 * 3)  # (128, 64*3*3)
         dense4_weight = dense4_weight.T  # (64*3*3, 128)
         dense4_weight = np.ascontiguousarray(dense4_weight)
 
@@ -159,8 +161,10 @@ def main():
         # NB: Numpy linear transform weights stored transposed by PyTorch
         dense5_weight = state_dict["dense5.weight"].numpy()  # (256, 3*3*128)
         dense5_weight = dense5_weight.reshape(256, 3, 3, 128)  # (256, 3, 3, 128)
-        dense5_weight = np.moveaxis(dense5_weight, (1, 2, 3), (3, 2, 1))  # (256, 128, 3, 3)
-        dense5_weight = dense5_weight.reshape(256, 128*3*3)  # (256, 128*3*3)
+        dense5_weight = np.moveaxis(
+            dense5_weight, (1, 2, 3), (3, 2, 1)
+        )  # (256, 128, 3, 3)
+        dense5_weight = dense5_weight.reshape(256, 128 * 3 * 3)  # (256, 128*3*3)
         dense5_weight = dense5_weight.T  # (128*3*3, 256)
         dense5_weight = np.ascontiguousarray(dense5_weight)
 

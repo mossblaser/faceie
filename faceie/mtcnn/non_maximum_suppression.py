@@ -18,7 +18,7 @@ def non_maximum_suppression(
     Performs non-maximum suppression (NMS) on a collection of bounding boxes
     and associated probabilities. This returns the subset of bounding boxes
     which are both sufficiently non-overlapping.
-    
+
     Parameters
     ==========
     probabilities : array (num_candidates)
@@ -31,7 +31,7 @@ def non_maximum_suppression(
     maximum_iou : float
         The maximum overlapping area (as Intersection over Union (IoU)) two
         bounding boxes can have before the lower-probability box is removed.
-    
+
     Returns
     =======
     array (num_results)
@@ -48,16 +48,16 @@ def non_maximum_suppression(
         best_index = candidate_indices[-1]
         selected_indices.append(best_index)
         candidate_indices = candidate_indices[:-1]
-        
+
         # Now lets find (and remove) any faces which overlap with this face by
         # too much.
-        
+
         # Bounding box of most likely ('Best') face
         bx1, by1, bx2, by2 = bounding_boxes[best_index]
-        
+
         # Bounding boxes of all 'Other' candidate faces
         ox1s, oy1s, ox2s, oy2s = bounding_boxes[candidate_indices].T
-        
+
         # Work out intersecting areas
         #
         # In 1D, consider two pairs of coordinates with an intersecting region:
@@ -79,23 +79,22 @@ def non_maximum_suppression(
         intersection_x1s = np.maximum(bx1, ox1s)
         intersection_x2s = np.minimum(bx2, ox2s)
         intersection_xs = np.maximum(0, intersection_x2s - intersection_x1s)
-        
+
         intersection_y1s = np.maximum(by1, oy1s)
         intersection_y2s = np.minimum(by2, oy2s)
         intersection_ys = np.maximum(0, intersection_y2s - intersection_y1s)
-        
+
         intersection_areas = intersection_xs * intersection_ys
-        
+
         # Now lets compute the total area of the union of the best bounding box
         # and all other bounding boxes.
         best_area = (bx2 - bx1) * (by2 - by1)
         other_areas = (ox2s - ox1s) * (oy2s - oy1s)
         union_areas = best_area + other_areas - intersection_areas
-        
+
         # Finally, lets compute the intersection-over-union (IoU) and discard
         # any candidates with excessive overlap
         ious = intersection_areas / union_areas
         candidate_indices = candidate_indices[np.where(ious <= maximum_iou)]
-    
-    return np.array(selected_indices, dtype=int)
 
+    return np.array(selected_indices, dtype=int)

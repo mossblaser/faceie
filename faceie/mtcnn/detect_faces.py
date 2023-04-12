@@ -16,24 +16,23 @@ from faceie.mtcnn.model import p_net, r_net, o_net
 from faceie.mtcnn.non_maximum_suppression import non_maximum_suppression
 
 
-
 def resolve_p_net_bounding_boxes(bounding_boxes: NDArray) -> NDArray:
     """
     Given the bounding box output of :py:func:`p_net`, resolve all bounding box
     coordinates to absolute pixel coordinates in the input image.
-    
+
     Modifies the provided array in-place, but also returns it for convenience.
     """
     # The convolution kernel is 12x12 and so coordinates run from 0 to 11
     # inclusive -- here we scale-up from the nominal range of 0-1.
     bounding_boxes *= 11.0
-    
+
     # Since the p_net convolution has a stride of 2x2, the output grid is half
     # the size so we multiply by two here to compensate.
     ys, xs = np.indices(bounding_boxes.shape[:2]) * 2
     bounding_boxes[..., 0::2] += np.expand_dims(xs, -1)
     bounding_boxes[..., 1::2] += np.expand_dims(ys, -1)
-    
+
     return bounding_boxes
 
 
@@ -41,7 +40,7 @@ def make_square(bounding_boxes: NDArray, axis: int) -> NDArray:
     """
     Given an array of bounding boxes, enlarge these as necessary, centered on
     the existing centre point, to make them square.
-    
+
     Parameters
     ==========
     bounding_boxes: array (..., 4, ...)
@@ -49,7 +48,7 @@ def make_square(bounding_boxes: NDArray, axis: int) -> NDArray:
         and y2 coordinates of a bounding box.
     axis : int
         The index of the axis enumerating the bounding box coordinates.
-    
+
     Returns
     =======
     array (same shape as bounding_boxes)
@@ -57,50 +56,54 @@ def make_square(bounding_boxes: NDArray, axis: int) -> NDArray:
     """
     # Make axis index positive
     axis %= bounding_boxes.ndim
-    
+
     # Sanity check
     assert bounding_boxes.shape[axis] == 4
-    
+
     # This function returns an index like (..., n, ...) with the 'n' on the
     # specified axis.
-    I = lambda n: tuple(n if i == axis else slice(None) for i in range(bounding_boxes.ndim))
+    I = lambda n: tuple(
+        n if i == axis else slice(None) for i in range(bounding_boxes.ndim)
+    )
     IX1 = I(0)
     IY1 = I(1)
     IX2 = I(2)
     IY2 = I(3)
-    
+
     x1s = bounding_boxes[IX1]
     y1s = bounding_boxes[IY1]
     x2s = bounding_boxes[IX2]
     y2s = bounding_boxes[IY2]
-    
+
     # Find longest of width and height
     ws = x2s - x1s
     hs = y2s - y1s
     ls = np.maximum(ws, hs)
-    
+
     # Compute centre of bounding boxes
     cxs = x1s + (ws * 0.5)
     cys = y1s + (hs * 0.5)
-    
+
     half_ls = ls * 0.5
-    
+
     # Compute new bounding boxes
     out = np.empty_like(bounding_boxes)
     out[IX1] = cxs - half_ls
     out[IY1] = cys - half_ls
     out[IX2] = cxs + half_ls
     out[IY2] = cys + half_ls
-    
+
     return out
 
 
-def resolve_coordinates(input_bounding_boxes: NDArray, coordinate_pairs: NDArray) -> NDArray:
+def resolve_coordinates(
+    input_bounding_boxes: NDArray, coordinate_pairs: NDArray
+) -> NDArray:
     """
     Resolve coordinates (e.g. bounding box or landmark coordinates produced by
     the :py:func:`r_net` or :py:func:`o_net` functions) from 0-1 ranges to
     actual pixel coordinates.
-    
+
     Parameters
     ==========
     input_bounding_boxes : array (num_batches, 4)
@@ -109,24 +112,24 @@ def resolve_coordinates(input_bounding_boxes: NDArray, coordinate_pairs: NDArray
     coordinate_pairs : array (num_batches, even-number)
         An array of interleaved values like x1, y1, x2, y2, ... which will be
         scaled from nominal 0-1 ranges to actual pixel values.
-        
+
         This array will be modified in-place.
-    
+
     Returns
     =======
     Returns the ``coordinate_pairs`` array again.
     """
     widths = input_bounding_boxes[:, 2] - input_bounding_boxes[:, 0]
     heights = input_bounding_boxes[:, 3] - input_bounding_boxes[:, 1]
-    
+
     # Scale offsets to input size
     coordinate_pairs[:, 0::2] *= np.expand_dims(widths, -1)
     coordinate_pairs[:, 1::2] *= np.expand_dims(heights, -1)
-    
+
     # Translate into position
     coordinate_pairs[:, 0::2] += np.expand_dims(input_bounding_boxes[:, 0], -1)
     coordinate_pairs[:, 1::2] += np.expand_dims(input_bounding_boxes[:, 1], -1)
-    
+
     return coordinate_pairs
 
 
@@ -136,14 +139,14 @@ def image_to_array(image: Image.Image) -> NDArray:
     height, width) and valuesin the range -1 to +1.
     """
     out = np.asarray(image).astype(np.float32)
-    
+
     # Rescale
     out -= 127.5
     out /= 128.0
-    
+
     # Move channels to front
     out = np.moveaxis(out, 2, 0)
-    
+
     return out
 
 
@@ -155,7 +158,7 @@ def get_proposals(
     Given an image, run the :py:func:`p_net` proposal stage against an image,
     returning the probabilities and bounding boxes of all potential faces
     detected.
-    
+
     Parameters
     ==========
     image : array (3, height, width)
@@ -163,7 +166,7 @@ def get_proposals(
         12x12 pixels.
     probability_threshold : float
         The minimum probability of a face to accept as a proposal.
-    
+
     Return
     ======
     array (num_proposals)
@@ -174,23 +177,23 @@ def get_proposals(
         inclusive.
     """
     probs, bboxes = p_net(image)
-    
+
     # Flatten
     shape = probs.shape
     probs = probs.reshape(np.product(shape))
     bboxes = bboxes.reshape(np.product(shape), 4)
-    
+
     # Select only candidates with sufficiently high probability
     above_threshold = probs > probability_threshold
     probs = probs[above_threshold]
     bboxes = bboxes[above_threshold]
-    
+
     # Resolve bounding boxes to pixel coordinates
     bboxes *= 11
     ys, xs = np.unravel_index(np.flatnonzero(above_threshold), shape)
     bboxes[:, 0::2] += np.expand_dims(xs, 1) * 2
     bboxes[:, 1::2] += np.expand_dims(ys, 1) * 2
-    
+
     return (probs, bboxes)
 
 
@@ -202,7 +205,7 @@ def refine_proposals(
     """
     Given a series of potential faces, return a more accurate probability and
     bounding box.
-    
+
     Parameters
     ==========
     pyramid : ImagePyramid
@@ -211,7 +214,7 @@ def refine_proposals(
         The bounding boxes defining the locations of faces in the input image.
     probability_threshold : float
         The minimum (refined) probability of a face to return.
-    
+
     Return
     ======
     probabilities : array (num_accepted_proposals)
@@ -250,7 +253,7 @@ def output_proposals(
     """
     Given a series of potential faces, return a final (output) probability,
     bounding box and (optional) set of facial landmarks.
-    
+
     Parameters
     ==========
     pyramid : ImagePyramid
@@ -259,7 +262,7 @@ def output_proposals(
         The bounding boxes defining the locations of faces in the input image.
     probability_threshold : float
         The minimum (refined) probability of a face to return.
-    
+
     Return
     ======
     probabilities : array (num_accepted_proposals)
@@ -300,20 +303,20 @@ class DetectedFaces(NamedTuple):
     """
     The output of :py:func:`detect_faces`.
     """
-    
+
     probabilities: NDArray
     """
     A (num_faces, ) shaped array giving the probability score (0.0 - 1.0)
     assigned to each detected face.
     """
-    
+
     bounding_boxes: NDArray
     """
     A (num_faces, 4) shaped array giving the coordinates of a bounding box for
     each detected face as x1, y1, x2 and y2. Coordinates are given in terms of
     input pixels and are *inclusive*.
     """
-    
+
     landmarks: NDArray
     """
     A (num_faces, 10) shaped array giving the coordinates of five detected facial
@@ -341,7 +344,7 @@ def detect_faces(
 ) -> DetectedFaces:
     """
     Detect faces within an image using the MTCNN algorithm by Zhang et al.
-    
+
     Parameters
     ==========
     image : Image
@@ -364,37 +367,39 @@ def detect_faces(
     output_maximum_iou : float
         The threshold of the intersection-over-union above which two rectangles
         are duplicates during each of the three processing stages.
-    
+
     Returns
     =======
     DetectedFaces
         For each detected face, a probability, bounding box and set of facial
         landmarks.
     """
-    pyramid = ImagePyramid(image, min_size=12, downscale_factor=pyramid_downscale_factor)
-    
+    pyramid = ImagePyramid(
+        image, min_size=12, downscale_factor=pyramid_downscale_factor
+    )
+
     # First 'proposal' stage. Run convolution at multiple scales
     # ----------------------------------------------------------
     all_level_probs = []
     all_level_bboxes = []
-    
+
     first_level = pyramid.closest_level(proposal_skip_downscale_factor)
     for level, image in enumerate(pyramid):
         if level < first_level:
             continue
-        
+
         probs, bboxes = get_proposals(
             image_to_array(image),
             proposal_probability_threshold,
         )
-        
+
         # Remove overlaps within level using NMS
         selection = non_maximum_suppression(probs, bboxes, proposal_maximum_iou)
-        
+
         scale_to_native = pyramid.scale_between(level, 0)
         all_level_probs.append(probs[selection])
         all_level_bboxes.append(bboxes[selection] * scale_to_native)
-    
+
     probs = np.concatenate(all_level_probs)
     bboxes = np.concatenate(all_level_bboxes)
 
@@ -407,7 +412,7 @@ def detect_faces(
     # Second 'refinement' stage. Run network against each image in turn.
     # ------------------------------------------------------------------
     probs, bboxes = refine_proposals(pyramid, bboxes, refine_probability_threshold)
-    
+
     # Remove overlapping candidates with NMS
     selection = non_maximum_suppression(probs, bboxes, refine_maximum_iou)
     probs = probs[selection]
@@ -415,12 +420,14 @@ def detect_faces(
 
     # Third 'output' stage. Additional refinement and landmark location.
     # ------------------------------------------------------------------
-    probs, bboxes, landmarks = output_proposals(pyramid, bboxes, output_probability_threshold)
+    probs, bboxes, landmarks = output_proposals(
+        pyramid, bboxes, output_probability_threshold
+    )
 
     # Remove overlapping candidates with NMS
     selection = non_maximum_suppression(probs, bboxes, output_maximum_iou)
     probs = probs[selection]
     bboxes = bboxes[selection]
     landmarks = landmarks[selection]
-    
+
     return DetectedFaces(probs, bboxes, landmarks)
