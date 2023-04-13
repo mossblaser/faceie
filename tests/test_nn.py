@@ -8,56 +8,132 @@ import torch
 from faceie.nn import conv2d, prelu, max_pool_2d, softmax
 
 
-def test_conv2d() -> None:
-    # Compare behaviour against PyTorch
-
-    num_batches = 2
-    in_channels = 3
-    out_channels = 4
-    kernel_height = 5
-    kernel_width = 7
-
-    img_height = 768
-    img_width = 1024
-
-    torch_conv2d = torch.nn.Conv2d(
-        in_channels=in_channels,
-        out_channels=out_channels,
-        kernel_size=(kernel_height, kernel_width),
+class TestConv2D:
+    @pytest.mark.parametrize(
+        "kernel, stride, padding",
+        [
+            # No stride or padding
+            ((3, 3), 1, 0),
+            # Not square
+            ((3, 5), 1, 0),
+            # Strided
+            ((3, 3), 2, 0),
+            ((3, 3), (2, 1), 0),
+            ((3, 3), (1, 2), 0),
+            ((3, 5), (1, 2), 0),  # Also not square!
+            # Padded
+            ((3, 3), 1, 1),
+            ((5, 5), 1, 2),
+            ((5, 5), 1, (2, 0)),
+            ((5, 5), 1, (0, 2)),
+            ((3, 5), 1, (0, 2)),  # Also not square!
+        ],
     )
+    def test_one_hot(
+        self,
+        kernel: tuple[int, int],
+        stride: int | tuple[int, int],
+        padding: int | tuple[int, int],
+    ) -> None:
+        # This test convolves the input with various kernel sizes, strides and
+        # paddings when processing a series of one-hot input arrays. These
+        # provide an easy-to-debug test case for working out issues with
+        # padding and suchlike.
 
-    # Sanity check
-    assert torch_conv2d.weight is not None
-    assert torch_conv2d.bias is not None
-    assert torch_conv2d.weight.shape == (
-        out_channels,
-        in_channels,
-        kernel_height,
-        kernel_width,
-    )
-    assert torch_conv2d.bias.shape == (out_channels,)
+        weights = np.arange(1, (kernel[0] * kernel[1]) + 1, dtype=np.float32).reshape(
+            1, 1, *kernel
+        )
+        biases = np.array([100], dtype=np.float32)
 
-    # Get model answer
-    img_tensor = torch.randn(num_batches, in_channels, img_height, img_width)
-    with torch.no_grad():
-        torch_out = torch_conv2d(img_tensor)
+        height = 6
+        width = 10
 
-    # Convert image/weights/biases to NDArray
-    img = img_tensor.numpy()
-    weights = torch_conv2d.weight.detach().numpy()
-    biases = torch_conv2d.bias.detach().numpy()
+        # Compare output with PyTorch implementation
+        torch_conv2d = torch.nn.Conv2d(
+            in_channels=1,
+            out_channels=1,
+            kernel_size=kernel,
+            stride=stride,
+            padding=padding,
+        )
+        with torch.no_grad():
+            torch_conv2d.weight[:] = torch.tensor(weights)
+            assert torch_conv2d.bias is not None
+            torch_conv2d.bias[:] = torch.tensor(biases)
 
-    out = conv2d(img, weights, biases)
+        for i in range(width * height):
+            img = np.zeros((1, 1, height, width), dtype=np.float32)
+            img.flat[i] = 1
 
-    # Sanity check shape
-    out_height = img_height - ((kernel_height // 2) * 2)
-    out_width = img_width - ((kernel_width // 2) * 2)
-    assert out.shape == (num_batches, out_channels, out_height, out_width)
+            print("")
+            print(f"{height=}, {width=}, {kernel=}, {stride=}, {padding=}")
+            print(f"{img.shape=}")
+            print(img)
 
-    # Check equivalent to PyTorch
-    #
-    # NB higher tollerance due to float32 precision
-    assert np.allclose(out, torch_out.numpy(), atol=1e-6)
+            out = conv2d(img, weights, biases, stride=stride, padding=padding)
+
+            print(f"{out.shape=}")
+            print(out)
+
+            with torch.no_grad():
+                exp_out = torch_conv2d(torch.tensor(img)).numpy()
+
+            print(f"{exp_out.shape=}")
+            print(exp_out)
+
+            assert np.array_equal(out, exp_out)
+
+    def test_batches_and_channels(self) -> None:
+        # Compare behaviour against PyTorch with a testcase with random weights
+        # and inputs which uses batching and  multiple input and output
+        # channels.
+        num_batches = 2
+        in_channels = 3
+        out_channels = 4
+        kernel_height = 5
+        kernel_width = 7
+
+        img_height = 768
+        img_width = 1024
+
+        torch_conv2d = torch.nn.Conv2d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=(kernel_height, kernel_width),
+        )
+
+        # Sanity check
+        assert torch_conv2d.weight is not None
+        assert torch_conv2d.bias is not None
+        assert torch_conv2d.weight.shape == (
+            out_channels,
+            in_channels,
+            kernel_height,
+            kernel_width,
+        )
+        assert torch_conv2d.bias.shape == (out_channels,)
+
+        # Get model answer
+        img_tensor = torch.randn(num_batches, in_channels, img_height, img_width)
+        with torch.no_grad():
+            torch_out = torch_conv2d(img_tensor)
+
+        # Convert image/weights/biases to NDArray
+        img = img_tensor.numpy()
+        weights = torch_conv2d.weight.detach().numpy()
+        biases = torch_conv2d.bias.detach().numpy()
+
+        out = conv2d(img, weights, biases)
+
+        # Sanity check shape
+        out_height = img_height - ((kernel_height // 2) * 2)
+        out_width = img_width - ((kernel_width // 2) * 2)
+        assert out.shape == (num_batches, out_channels, out_height, out_width)
+
+        # Check equivalent to PyTorch
+        #
+        # NB higher tollerance due to float32 precision
+        assert np.allclose(out, torch_out.numpy(), atol=1e-6)
 
 
 def test_prelu() -> None:
