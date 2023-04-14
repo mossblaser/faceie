@@ -5,7 +5,38 @@ from numpy.typing import NDArray
 
 import torch
 
-from faceie.nn import conv2d, relu, prelu, max_pool_2d, softmax
+from faceie.nn import batch_normalisation_2d, conv2d, relu, prelu, max_pool_2d, softmax
+
+
+@pytest.mark.parametrize("channel_axis", [1, -3])
+def test_batch_normalisation_2d(channel_axis: int) -> None:
+    x = np.arange(3 * 2 * 2).reshape(1, 3, 2, 2) + 1
+
+    weights = np.array([10, 100, 1000])
+    biases = np.array([1, 2, 3])
+
+    out = batch_normalisation_2d(x, weights, biases, channel_axis=channel_axis)
+
+    exp = np.array(
+        [
+            [
+                [
+                    [11, 21],
+                    [31, 41],
+                ],
+                [
+                    [502, 602],
+                    [702, 802],
+                ],
+                [
+                    [9003, 10003],
+                    [11003, 12003],
+                ],
+            ],
+        ],
+    )
+
+    assert np.array_equal(out, exp)
 
 
 class TestConv2D:

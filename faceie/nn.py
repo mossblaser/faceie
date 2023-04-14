@@ -15,6 +15,37 @@ def linear(x: NDArray, weights: NDArray, biases: NDArray) -> NDArray:
     return (x @ weights) + biases
 
 
+def batch_normalisation_2d(
+    x: NDArray, weights: NDArray, biases: NDArray, channel_axis: int = 1
+) -> NDArray:
+    """
+    Apply a set of (precomputed) batch normalisation weights and biases to a
+    collection of 2D multi-channel values.
+
+    Parameters
+    ==========
+    x : array (..., channel, ...)
+        The input array, typically of shape (batch, channel, height, width).
+    weights : array (channel, )
+        A 1D array giving the scaling factors to apply to all values in each
+        channel in the input.
+    biases : array (channel, )
+        A 1D array giving the offset to add to all values in each channel in
+        the input.
+    channel_axis : int
+        The index of the channel axis in ``x``.
+    """
+    # Make channel axis index positive
+    channel_axis %= x.ndim
+
+    # Reshape weights biases to broadcast along the correct axis
+    new_shape = tuple(-1 if i == channel_axis else 1 for i in range(x.ndim))
+    weights = weights.reshape(new_shape)
+    biases = biases.reshape(new_shape)
+
+    return (x * weights) + biases
+
+
 def conv2d(
     img: NDArray,
     weights: NDArray,
