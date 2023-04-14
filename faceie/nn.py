@@ -18,7 +18,7 @@ def linear(x: NDArray, weights: NDArray, biases: NDArray) -> NDArray:
 def conv2d(
     img: NDArray,
     weights: NDArray,
-    biases: NDArray | None,
+    biases: NDArray | None = None,
     stride: int | tuple[int, int] = 1,
     padding: int | tuple[int, int] = 0,
 ) -> NDArray:
