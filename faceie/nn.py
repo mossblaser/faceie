@@ -260,6 +260,16 @@ def conv2d(
         return out[0]
 
 
+def relu(x: NDArray) -> NDArray:
+    """
+    Implements a Rectified Linear Unit (ReLU).
+
+    Values in ``x`` are mapped to themselves if greater than zero or clamped to
+    zero otherwise.
+    """
+    return np.maximum(x, 0)
+
+
 def prelu(x: NDArray, parameters: NDArray, axis: int) -> NDArray:
     """
     Implements Parameterised Rectified Linear Unit (PReLU).

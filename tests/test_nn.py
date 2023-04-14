@@ -5,7 +5,7 @@ from numpy.typing import NDArray
 
 import torch
 
-from faceie.nn import conv2d, prelu, max_pool_2d, softmax
+from faceie.nn import conv2d, relu, prelu, max_pool_2d, softmax
 
 
 class TestConv2D:
@@ -134,6 +134,26 @@ class TestConv2D:
         #
         # NB higher tollerance due to float32 precision
         assert np.allclose(out, torch_out.numpy(), atol=1e-6)
+
+
+def test_relu() -> None:
+    num_channels = 10
+
+    input_shape = (3, num_channels, 100, 200)
+
+    torch_relu = torch.nn.ReLU(inplace=False)
+
+    # Get model answer
+    in_tensor = torch.randn(*input_shape)
+    with torch.no_grad():
+        out_tensor = torch_relu(in_tensor)
+
+    # Convert types
+    input = in_tensor.numpy()
+
+    out = relu(input)
+
+    assert np.allclose(out, out_tensor.numpy(), atol=1e-6)
 
 
 def test_prelu() -> None:
