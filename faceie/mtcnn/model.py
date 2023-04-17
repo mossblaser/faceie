@@ -214,7 +214,7 @@ def p_net(img, weights: PNetWeights | None = None) -> tuple[NDArray, NDArray]:
     # NB: The Zhang et al. paper specifies 3x3 max pooling here but the PyTorch
     # implementation uses a 2x2 kernel instead. We do the same here to keep the
     # implementations compatible.
-    x = max_pool_2d(x, kernel=2, stride=2)  # (10, (height-2) // 2, (width-2) // 2)
+    x = max_pool_2d(x, kernel=2, stride=2, ceil_mode=True)  # (10, (height-2) // 2, (width-2) // 2)
 
     # Second (3x3) convolution stage
     x = conv2d(x, *weights.conv2)  # (16, ((height-2) // 2) - 2, ((width-2) // 2) - 2)
@@ -284,12 +284,12 @@ def r_net(img, weights: RNetWeights | None = None) -> tuple[NDArray, NDArray]:
     # First (3x3) convolution stage
     x = conv2d(img, *weights.conv1)  # (num_batches, 28, 22, 22)
     x = prelu(x, weights.prelu1, axis=1)  # See PReLU/ReLU note in p_net
-    x = max_pool_2d(x, kernel=3, stride=2)  # (num_batches, 28, 11, 11)
+    x = max_pool_2d(x, kernel=3, stride=2, ceil_mode=True)  # (num_batches, 28, 11, 11)
 
     # Second (3x3) convolution stage
     x = conv2d(x, *weights.conv2)  # (num_batches, 48, 9, 9)
     x = prelu(x, weights.prelu2, axis=1)
-    x = max_pool_2d(x, kernel=3, stride=2)  # (num_batches, 48, 4, 4)
+    x = max_pool_2d(x, kernel=3, stride=2, ceil_mode=True)  # (num_batches, 48, 4, 4)
 
     # Third (2x2) convolution stage
     #
@@ -370,17 +370,17 @@ def o_net(img, weights: ONetWeights | None = None) -> tuple[NDArray, NDArray, ND
     # First (3x3) convolution stage
     x = conv2d(img, *weights.conv1)  # (num_batches, 32, 46, 46)
     x = prelu(x, weights.prelu1, axis=1)  # See PReLU/ReLU note in p_net
-    x = max_pool_2d(x, kernel=3, stride=2)  # (num_batches, 32, 23, 23)
+    x = max_pool_2d(x, kernel=3, stride=2, ceil_mode=True)  # (num_batches, 32, 23, 23)
 
     # Second (3x3) convolution stage
     x = conv2d(x, *weights.conv2)  # (num_batches, 64, 21, 21)
     x = prelu(x, weights.prelu2, axis=1)
-    x = max_pool_2d(x, kernel=3, stride=2)  # (num_batches, 64, 10, 10)
+    x = max_pool_2d(x, kernel=3, stride=2, ceil_mode=True)  # (num_batches, 64, 10, 10)
 
     # Third (3x3) convolution stage
     x = conv2d(x, *weights.conv3)  # (num_batches, 64, 8, 8)
     x = prelu(x, weights.prelu3, axis=1)
-    x = max_pool_2d(x, kernel=2, stride=2)  # (num_batches, 64, 4, 4)
+    x = max_pool_2d(x, kernel=2, stride=2, ceil_mode=True)  # (num_batches, 64, 4, 4)
 
     # Fourth (2x2) convolution stage
     x = conv2d(x, *weights.conv4)  # (num_batches, 128, 3, 3)

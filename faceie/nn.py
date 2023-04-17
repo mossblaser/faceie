@@ -371,7 +371,7 @@ def max_pool_2d(
     x: NDArray,
     kernel: int | tuple[int, int],
     stride: int | tuple[int, int],
-    ceil_mode: bool = True,
+    ceil_mode: bool = False,
     out: NDArray | None = None,
 ) -> NDArray:
     """
