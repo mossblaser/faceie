@@ -5,7 +5,15 @@ from numpy.typing import NDArray
 
 import torch
 
-from faceie.nn import batch_normalisation_2d, conv2d, relu, prelu, max_pool_2d, softmax
+from faceie.nn import (
+    PaddingType,
+    batch_normalisation_2d,
+    conv2d,
+    relu,
+    prelu,
+    max_pool_2d,
+    softmax,
+)
 
 
 @pytest.mark.parametrize("channel_axis", [1, -3])
@@ -165,6 +173,20 @@ class TestConv2D:
         #
         # NB higher tollerance due to float32 precision
         assert np.allclose(out, torch_out.numpy(), atol=1e-6)
+
+    def test_padding_same(self) -> None:
+        kernel = (5, 3)
+
+        weights = np.zeros((1, 1, kernel[0], kernel[1]), dtype=np.float32)
+
+        height = 6
+        width = 10
+
+        img = np.zeros((1, height, width), dtype=np.float32)
+
+        out = conv2d(img, weights, padding=PaddingType.same)
+
+        assert out.shape == img.shape
 
 
 def test_relu() -> None:

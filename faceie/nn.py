@@ -2,6 +2,8 @@
 A collection of generic deep neural network functions.
 """
 
+from enum import Enum, auto
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -46,12 +48,29 @@ def batch_normalisation_2d(
     return (x * weights) + biases
 
 
+class PaddingType(Enum):
+    """
+    'Automatic' padding types for convolution-style functions.
+    """
+
+    valid = auto()
+    """
+    Alias for padding = 0, that is, only use 'valid' input data.
+    """
+
+    same = auto()
+    """
+    Use the ammount of padding required to make the convolution output the same
+    size as the input. Requires that the kernel has odd dimensions.
+    """
+
+
 def conv2d(
     img: NDArray,
     weights: NDArray,
     biases: NDArray | None = None,
     stride: int | tuple[int, int] = 1,
-    padding: int | tuple[int, int] = 0,
+    padding: int | tuple[int, int] | PaddingType = 0,
 ) -> NDArray:
     """
     Perform 2D convolution on the provided image using the provided kernel
@@ -67,7 +86,7 @@ def conv2d(
         The biases to add to each output channel -- or None to not add biases.
     stride : int or (int, int)
         The stride of the convolutional filter.
-    padding : int or (int, int)
+    padding : int or (int, int) or PaddingType
         The (zero) padding to add to the top-and-bottom and left-and-right of
         the input. When non-zero, stride must be 1.
 
@@ -79,9 +98,22 @@ def conv2d(
         The num_batches dimension will be present iff it it was included in the
         input img.
     """
-    # Expand stride and padding to pairs
+    num_batches = img.shape[0]
+    out_channels, in_channels, kernel_height, kernel_width = weights.shape
+
+    # Expand stride to pairs
     if isinstance(stride, int):
         stride = (stride, stride)
+
+    # Expand padding to pairs
+    if isinstance(padding, PaddingType):
+        if padding is PaddingType.valid:
+            padding = 0
+        elif padding is PaddingType.same:
+            padding = (
+                (kernel_height - 1) // 2,
+                (kernel_width - 1) // 2,
+            )
     if isinstance(padding, int):
         padding = (padding, padding)
 
@@ -93,9 +125,6 @@ def conv2d(
     batched = len(img.shape) == 4
     if not batched:
         img = np.expand_dims(img, 0)
-
-    num_batches = img.shape[0]
-    out_channels, in_channels, kernel_height, kernel_width = weights.shape
 
     # Produce a sliding window over the input image to which the kernel will be
     # applied.
