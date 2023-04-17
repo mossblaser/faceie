@@ -97,6 +97,11 @@ def conv2d(
 
         The num_batches dimension will be present iff it it was included in the
         input img.
+        
+        The output dimensions are given by the formulae below:
+        
+        * out_height = floor((img_height + 2*padding[0] - kernel_size[0]) / stride[0]) + 1
+        * out_width = floor((img_width + 2*padding[1] - kernel_size[1]) / stride[1]) + 1
     """
     num_batches = img.shape[0]
     out_channels, in_channels, kernel_height, kernel_width = weights.shape
