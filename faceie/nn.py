@@ -18,34 +18,82 @@ def linear(x: NDArray, weights: NDArray, biases: NDArray) -> NDArray:
 
 
 def batch_normalisation_2d(
-    x: NDArray, weights: NDArray, biases: NDArray, channel_axis: int = 1
+    x: NDArray,
+    population_mean: NDArray,
+    population_variance: NDArray,
+    weights: NDArray,
+    biases: NDArray,
+    eps: float = 1e-5,
+    channel_axis: int = 1,
 ) -> NDArray:
     """
-    Apply a set of (precomputed) batch normalisation weights and biases to a
-    collection of 2D multi-channel values.
+    Apply a (precomputed) batch normalisation to a collection of 2D
+    multi-channel values.
+
+    See "Batch Normalization: Accelerating Deep Network Training by Reducing
+    Internal Covariate Shift" by Ioffe and Szegedy (2015).
 
     Parameters
     ==========
     x : array (..., channel, ...)
         The input array, typically of shape (batch, channel, height, width).
+    population_mean : array (channel, )
+    population_variance : array (channel, )
+        The (approximated) population mean and variance measured during
+        training. Given for each channel as a whole in the input.
     weights : array (channel, )
-        A 1D array giving the scaling factors to apply to all values in each
-        channel in the input.
     biases : array (channel, )
-        A 1D array giving the offset to add to all values in each channel in
-        the input.
+        A 1D array giving the scaling factors and offsets to apply to all
+        values in each channel in the input.
+    eps : float
+        The standard deviation is actually computed as sqrt(variance + eps)
+        where eps is a small constant used to avoid division by zero.
     channel_axis : int
         The index of the channel axis in ``x``.
     """
-    # Make channel axis index positive
-    channel_axis %= x.ndim
-
-    # Reshape weights biases to broadcast along the correct axis
+    # For the sake of avoiding scaling and offsetting the whole input twice
+    # (once to normalise and again to apply the weights and biases), we can
+    # fold these together into a single scaling and offsetting operaiton.
+    #
+    # Rarranging from the naive operation:
+    #
+    #   std = sqrt(variance + eps)
+    #
+    #   out = ( ((x - mean) / std)                     * weights) + biases
+    #          (((x - mean) / std) + (biases/weights)) * weights 
+    #
+    #          (((x - mean                         ) / std) + (biases/weights)) * weights
+    #           ((x - mean + ((biases/weights)*std)) / std)                     * weights
+    #
+    #          ((x - mean + ((biases/weights)*std)) /  std           ) * weights 
+    #           (x - mean + ((biases/weights)*std)) / (std / weights)
+    #
+    # Given this factorisation we can rewrite the whole thing as
+    #
+    #   out = (x + offset) * scale
+    #
+    # Where
+    #
+    #   scale = weights / std
+    #
+    #   offset = ((biases/weights)*std) - mean
+    #   offset = (biases*(std/weights)) - mean
+    #   offset = (biases/scale        ) - mean
+    
+    population_std = np.sqrt(population_variance + eps)
+    scale = weights / population_std
+    offset = (biases / scale) - population_mean
+    
+    # Reshape scale and offset to broadcast over the channels.
+    channel_axis %= x.ndim  # Make positive
     new_shape = tuple(-1 if i == channel_axis else 1 for i in range(x.ndim))
-    weights = weights.reshape(new_shape)
-    biases = biases.reshape(new_shape)
+    scale = scale.reshape(new_shape)
+    offset = offset.reshape(new_shape)
 
-    return (x * weights) + biases
+    # Scale and offset according to learned parameters
+    x = (x + offset) * scale
+
+    return x
 
 
 class PaddingType(Enum):
@@ -97,9 +145,9 @@ def conv2d(
 
         The num_batches dimension will be present iff it it was included in the
         input img.
-        
+
         The output dimensions are given by the formulae below:
-        
+
         * out_height = floor((img_height + 2*padding[0] - kernel_size[0]) / stride[0]) + 1
         * out_width = floor((img_width + 2*padding[1] - kernel_size[1]) / stride[1]) + 1
     """

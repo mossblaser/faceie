@@ -18,33 +18,43 @@ from faceie.nn import (
 
 @pytest.mark.parametrize("channel_axis", [1, -3])
 def test_batch_normalisation_2d(channel_axis: int) -> None:
-    x = np.arange(3 * 2 * 2).reshape(1, 3, 2, 2) + 1
+    rand = np.random.RandomState(0)
 
-    weights = np.array([10, 100, 1000])
-    biases = np.array([1, 2, 3])
+    num_batches = 2
+    num_channels = 3
 
-    out = batch_normalisation_2d(x, weights, biases, channel_axis=channel_axis)
+    x = rand.uniform(-10, 10, size=(num_batches, num_channels, 2, 2)).astype(np.float32)
 
-    exp = np.array(
-        [
-            [
-                [
-                    [11, 21],
-                    [31, 41],
-                ],
-                [
-                    [502, 602],
-                    [702, 802],
-                ],
-                [
-                    [9003, 10003],
-                    [11003, 12003],
-                ],
-            ],
-        ],
+    population_mean = rand.normal(size=num_channels).astype(np.float32)
+    population_variance = np.abs(rand.normal(size=num_channels).astype(np.float32))
+    weights = rand.normal(size=num_channels).astype(np.float32)
+    biases = rand.normal(size=num_channels).astype(np.float32)
+    eps = 1e-5
+
+    out = batch_normalisation_2d(
+        x,
+        population_mean,
+        population_variance,
+        weights,
+        biases,
+        eps=eps,
+        channel_axis=channel_axis,
     )
 
-    assert np.array_equal(out, exp)
+    # Work out model answer using PyTorch implementation
+    torch_batch_normalisation_2d = torch.nn.BatchNorm2d(num_channels, eps=eps).eval()
+    with torch.no_grad():
+        torch_batch_normalisation_2d.running_mean[:] = torch.tensor(population_mean)
+        torch_batch_normalisation_2d.running_var[:] = torch.tensor(population_variance)
+        torch_batch_normalisation_2d.weight[:] = torch.tensor(weights)
+        torch_batch_normalisation_2d.bias[:] = torch.tensor(biases)
+        
+        exp = torch_batch_normalisation_2d(torch.tensor(x)).numpy()
+
+    print(out)
+    print(exp)
+
+    assert np.allclose(out, exp, atol=1e-6)
 
 
 class TestConv2D:
