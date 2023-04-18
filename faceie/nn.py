@@ -60,12 +60,12 @@ def batch_normalisation_2d(
     #   std = sqrt(variance + eps)
     #
     #   out = ( ((x - mean) / std)                     * weights) + biases
-    #          (((x - mean) / std) + (biases/weights)) * weights 
+    #          (((x - mean) / std) + (biases/weights)) * weights
     #
     #          (((x - mean                         ) / std) + (biases/weights)) * weights
     #           ((x - mean + ((biases/weights)*std)) / std)                     * weights
     #
-    #          ((x - mean + ((biases/weights)*std)) /  std           ) * weights 
+    #          ((x - mean + ((biases/weights)*std)) /  std           ) * weights
     #           (x - mean + ((biases/weights)*std)) / (std / weights)
     #
     # Given this factorisation we can rewrite the whole thing as
@@ -79,11 +79,11 @@ def batch_normalisation_2d(
     #   offset = ((biases/weights)*std) - mean
     #   offset = (biases*(std/weights)) - mean
     #   offset = (biases/scale        ) - mean
-    
+
     population_std = np.sqrt(population_variance + eps)
     scale = weights / population_std
     offset = (biases / scale) - population_mean
-    
+
     # Reshape scale and offset to broadcast over the channels.
     channel_axis %= x.ndim  # Make positive
     new_shape = tuple(-1 if i == channel_axis else 1 for i in range(x.ndim))

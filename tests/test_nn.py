@@ -48,7 +48,7 @@ def test_batch_normalisation_2d(channel_axis: int) -> None:
         torch_batch_normalisation_2d.running_var[:] = torch.tensor(population_variance)
         torch_batch_normalisation_2d.weight[:] = torch.tensor(weights)
         torch_batch_normalisation_2d.bias[:] = torch.tensor(biases)
-        
+
         exp = torch_batch_normalisation_2d(torch.tensor(x)).numpy()
 
     print(out)

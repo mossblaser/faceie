@@ -214,7 +214,9 @@ def p_net(img, weights: PNetWeights | None = None) -> tuple[NDArray, NDArray]:
     # NB: The Zhang et al. paper specifies 3x3 max pooling here but the PyTorch
     # implementation uses a 2x2 kernel instead. We do the same here to keep the
     # implementations compatible.
-    x = max_pool_2d(x, kernel=2, stride=2, ceil_mode=True)  # (10, (height-2) // 2, (width-2) // 2)
+    x = max_pool_2d(
+        x, kernel=2, stride=2, ceil_mode=True
+    )  # (10, (height-2) // 2, (width-2) // 2)
 
     # Second (3x3) convolution stage
     x = conv2d(x, *weights.conv2)  # (16, ((height-2) // 2) - 2, ((width-2) // 2) - 2)
