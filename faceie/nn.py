@@ -10,11 +10,42 @@ from numpy.typing import NDArray
 from math import ceil, floor
 
 
-def linear(x: NDArray, weights: NDArray, biases: NDArray) -> NDArray:
+def linear(x: NDArray, weights: NDArray, biases: NDArray | None) -> NDArray:
     """
     A simple linear/dense layer: (x @ weights) + biases
     """
-    return (x @ weights) + biases
+    x = x @ weights
+
+    if biases is not None:
+        x += biases
+
+    return x
+
+
+def l2_normalisation(x: NDArray, axis: int, eps: float = 1e-12) -> NDArray:
+    """
+    Scale the values along the given axis of X such that their squares sum to
+    one.
+
+    Parameters
+    ==========
+    x : array (...)
+    axis : int
+        The axis in 'x' to normalise.
+    eps : float
+        To avoid division by zero in the case where the squared values sum to
+        zero (or almost zero), a minimum value to scale by instead.
+
+        Default value matches the default of PyTorch's nn.functional.normalize
+
+    Returns
+    =======
+    array (...)
+        Same shape as 'x'.
+    """
+    norm = np.linalg.norm(x, axis=axis, keepdims=True)
+    norm = np.maximum(norm, eps)
+    return x / norm
 
 
 def batch_normalisation_2d(
@@ -79,6 +110,9 @@ def batch_normalisation_2d(
     #   offset = ((biases/weights)*std) - mean
     #   offset = (biases*(std/weights)) - mean
     #   offset = (biases/scale        ) - mean
+    #
+    # TODO: Perhaps we ought to consider performing this folding in a helper
+    # function and just accepting the scale and offset values as arguments...?
 
     population_std = np.sqrt(population_variance + eps)
     scale = weights / population_std

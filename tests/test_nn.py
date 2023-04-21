@@ -6,6 +6,7 @@ from numpy.typing import NDArray
 import torch
 
 from faceie.nn import (
+    l2_normalisation,
     PaddingType,
     batch_normalisation_2d,
     conv2d,
@@ -14,6 +15,25 @@ from faceie.nn import (
     max_pool_2d,
     softmax,
 )
+
+
+def test_l2_normalisation() -> None:
+    rand = np.random.RandomState(0)
+
+    x = rand.uniform(-10, 10, size=(3, 4, 5)).astype(np.float32)
+
+    out = l2_normalisation(x, axis=1)
+
+    # Work out model answer using PyTorch implementation
+    exp = torch.nn.functional.normalize(torch.tensor(x), p=2.0, dim=1).numpy()
+
+    print(out)
+    print(exp)
+
+    print(np.sum(out**2, axis=1))
+    print(np.sum(exp**2, axis=1))
+
+    assert np.allclose(out, exp, atol=1e-6)
 
 
 @pytest.mark.parametrize("channel_axis", [1, -3])
