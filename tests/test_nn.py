@@ -25,7 +25,8 @@ def test_l2_normalisation() -> None:
     out = l2_normalisation(x, axis=1)
 
     # Work out model answer using PyTorch implementation
-    exp = torch.nn.functional.normalize(torch.tensor(x), p=2.0, dim=1).numpy()
+    exp_tensor = torch.nn.functional.normalize(torch.tensor(x), p=2.0, dim=1)
+    exp = exp_tensor.numpy()
 
     print(out)
     print(exp)
@@ -64,6 +65,8 @@ def test_batch_normalisation_2d(channel_axis: int) -> None:
     # Work out model answer using PyTorch implementation
     torch_batch_normalisation_2d = torch.nn.BatchNorm2d(num_channels, eps=eps).eval()
     with torch.no_grad():
+        assert torch_batch_normalisation_2d.running_mean is not None
+        assert torch_batch_normalisation_2d.running_var is not None
         torch_batch_normalisation_2d.running_mean[:] = torch.tensor(population_mean)
         torch_batch_normalisation_2d.running_var[:] = torch.tensor(population_variance)
         torch_batch_normalisation_2d.weight[:] = torch.tensor(weights)
