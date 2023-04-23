@@ -185,7 +185,6 @@ def conv2d(
         * out_height = floor((img_height + 2*padding[0] - kernel_size[0]) / stride[0]) + 1
         * out_width = floor((img_width + 2*padding[1] - kernel_size[1]) / stride[1]) + 1
     """
-    num_batches = img.shape[0]
     out_channels, in_channels, kernel_height, kernel_width = weights.shape
 
     # Expand stride to pairs
@@ -245,17 +244,18 @@ def conv2d(
     # Apply stride
     windows = windows[:, :, :: stride[0], :: stride[1], :, :]
 
-    # Apply the convolution kernel across all un-padded regions
-    out = np.einsum(
-        "bihwkl,oikl->bohw",
-        # (num_batches:b, in_channels:i, out_height:h, out_width:w, kernel_height:k, kernel_width:l)
-        windows,
-        # (out_channels:o, in_channels:i, kernel_size:k, kernel_size:l)
-        weights,
-        optimize=True,  # Free 10x speedup :D
-    )
+    num_batches = windows.shape[0]
+    out_height, out_width = windows.shape[2:4]
 
-    # Add biases
+    # Perform convolution
+    out = np.tensordot(
+        weights,  # (out_channels, in_channels, kernel_height, kernel_width)
+        windows,  # (num_batches, in_channels, out_height, out_width, kernel_height, kernel_width)
+        axes=((1, 2, 3), (1, 4, 5)),
+    )  # (out_channels, num_batches, out_height, out_width)
+    out = np.moveaxis(out, 0, 1)  # (num_batches, out_channels, out_height, out_width)
+
+    # Add biases (if given)
     if biases is not None:
         out += np.expand_dims(biases, (1, 2))  # bases.shape = (out_channels, 1, 1)
 
