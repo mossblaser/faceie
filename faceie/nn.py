@@ -213,6 +213,23 @@ def conv2d(
     if not batched:
         img = np.expand_dims(img, 0)
 
+    # Add padding (if required).
+    #
+    # NB: Experimentally, performing this copy is no slower than implementing
+    # the edge-cases manually below but makes for a substantially simpler
+    # implementation. (See commit 6892113 for a special-case based
+    # implementation of this function.
+    if padding[0] or padding[1]:
+        img = np.pad(
+            img,
+            (
+                (0, 0),  # num_batches
+                (0, 0),  # in_channels
+                (padding[0], padding[0]),  # height
+                (padding[1], padding[1]),  # width
+            ),
+        )
+
     # Produce a sliding window over the input image to which the kernel will be
     # applied.
     #
@@ -220,7 +237,7 @@ def conv2d(
     # sliding_window_view matching our (pretty vanilla) usage here. As such we
     # just ignore it for now...
     windows = np.lib.stride_tricks.sliding_window_view(  # type: ignore
-        img,  # (num_batches, in_channels, img_height, img_width)
+        img,  # (num_batches, in_channels, padded_img_height, padded_img_width)
         (kernel_height, kernel_width),
         axis=(-2, -1),
     )  # (num_batches, in_channels, out_height, out_width, kernel_height, kernel_width)
@@ -228,174 +245,15 @@ def conv2d(
     # Apply stride
     windows = windows[:, :, :: stride[0], :: stride[1], :, :]
 
-    # Create output array
-    out_height, out_width = windows.shape[2:4]
-    padded_out_height = out_height + (padding[0] * 2)
-    padded_out_width = out_width + (padding[1] * 2)
-    out = np.zeros(
-        (num_batches, out_channels, padded_out_height, padded_out_width),
-        dtype=windows.dtype,
-    )
-
     # Apply the convolution kernel across all un-padded regions
-    np.einsum(
+    out = np.einsum(
         "bihwkl,oikl->bohw",
         # (num_batches:b, in_channels:i, out_height:h, out_width:w, kernel_height:k, kernel_width:l)
         windows,
         # (out_channels:o, in_channels:i, kernel_size:k, kernel_size:l)
         weights,
-        # (num_batches, out_channels, out_height, out_width)
-        out=out[
-            :,
-            :,
-            padding[0] : padding[0] + out_height,
-            padding[1] : padding[1] + out_width,
-        ],
         optimize=True,  # Free 10x speedup :D
     )
-
-    # Apply convolutions which overhang into the padding regions
-    #
-    # Rather than expanding the input image (requiring a copy) we run
-    # convolutions with cropped kernels along the edges of the input to compute
-    # the equivalent values. This regrettably requires handling each edge and
-    # corner specially below leading to a fair bit of verbosity... Sorry.
-
-    # Overhang top/bottom edges only
-    for y_pad_offset in range(1, padding[0] + 1):
-        windows = np.lib.stride_tricks.sliding_window_view(  # type: ignore
-            img,
-            (kernel_height - y_pad_offset, kernel_width),
-            axis=(-2, -1),
-        )
-
-        # Top-edge convolutions
-        np.einsum(
-            "biwkl,oikl->bow",
-            # (num_batches:b, in_channels:i, out_width:w, kernel_height:k, kernel_width:l)
-            windows[:, :, 0, :],
-            # (out_channels:o, in_channels:i, kernel_size:k, kernel_size:l)
-            weights[:, :, y_pad_offset:, :],
-            out=out[
-                :, :, padding[0] - y_pad_offset, padding[1] : padding[1] + out_width
-            ],
-            optimize=True,
-        )
-
-        # Bottom-edge convolutions
-        np.einsum(
-            "biwkl,oikl->bow",
-            # (num_batches:b, in_channels:i, out_width:w, kernel_height:k, kernel_width:l)
-            windows[:, :, -1, :],
-            # (out_channels:o, in_channels:i, kernel_size:k, kernel_size:l)
-            weights[:, :, :-y_pad_offset, :],
-            out=out[
-                :,
-                :,
-                -(padding[0] - y_pad_offset + 1),
-                padding[1] : padding[1] + out_width,
-            ],
-            optimize=True,
-        )
-
-    # Overhang left/right edges only
-    for x_pad_offset in range(1, padding[1] + 1):
-        windows = np.lib.stride_tricks.sliding_window_view(  # type: ignore
-            img,
-            (kernel_height, kernel_width - x_pad_offset),
-            axis=(-2, -1),
-        )
-
-        # Top-edge convolutions
-        np.einsum(
-            "bihkl,oikl->boh",
-            # (num_batches:b, in_channels:i, out_height:h, kernel_height:k, kernel_width:l)
-            windows[:, :, :, 0],
-            # (out_channels:o, in_channels:i, kernel_size:k, kernel_size:l)
-            weights[:, :, :, x_pad_offset:],
-            out=out[
-                :, :, padding[0] : padding[0] + out_height, padding[1] - x_pad_offset
-            ],
-            optimize=True,
-        )
-
-        # Bottom-edge convolutions
-        np.einsum(
-            "bihkl,oikl->boh",
-            # (num_batches:b, in_channels:i, out_height:h, kernel_height:k, kernel_width:l)
-            windows[:, :, :, -1],
-            # (out_channels:o, in_channels:i, kernel_size:k, kernel_size:l)
-            weights[:, :, :, :-x_pad_offset],
-            out=out[
-                :,
-                :,
-                padding[0] : padding[0] + out_height,
-                -(padding[1] - x_pad_offset + 1),
-            ],
-            optimize=True,
-        )
-
-    # Overhang in corners
-    for y_pad_offset in range(1, padding[0] + 1):
-        for x_pad_offset in range(1, padding[1] + 1):
-            windows = np.lib.stride_tricks.sliding_window_view(  # type: ignore
-                img,
-                (kernel_height - y_pad_offset, kernel_width - x_pad_offset),
-                axis=(-2, -1),
-            )
-
-            # Top-left corner convolution
-            np.einsum(
-                "bikl,oikl->bo",
-                # (num_batches:b, in_channels:i, kernel_height:k, kernel_width:l)
-                windows[:, :, 0, 0],
-                # (out_channels:o, in_channels:i, kernel_size:k, kernel_size:l)
-                weights[:, :, y_pad_offset:, x_pad_offset:],
-                out=out[:, :, padding[0] - y_pad_offset, padding[1] - x_pad_offset],
-                optimize=True,
-            )
-
-            # Top-right corner convolution
-            np.einsum(
-                "bikl,oikl->bo",
-                # (num_batches:b, in_channels:i, kernel_height:k, kernel_width:l)
-                windows[:, :, 0, -1],
-                # (out_channels:o, in_channels:i, kernel_size:k, kernel_size:l)
-                weights[:, :, y_pad_offset:, :-x_pad_offset],
-                out=out[
-                    :, :, padding[0] - y_pad_offset, -(padding[1] - x_pad_offset + 1)
-                ],
-                optimize=True,
-            )
-
-            # Bottom-left corner convolution
-            np.einsum(
-                "bikl,oikl->bo",
-                # (num_batches:b, in_channels:i, kernel_height:k, kernel_width:l)
-                windows[:, :, -1, 0],
-                # (out_channels:o, in_channels:i, kernel_size:k, kernel_size:l)
-                weights[:, :, :-y_pad_offset, x_pad_offset:],
-                out=out[
-                    :, :, -(padding[0] - y_pad_offset + 1), padding[1] - x_pad_offset
-                ],
-                optimize=True,
-            )
-
-            # Bottom-right corner convolution
-            np.einsum(
-                "bikl,oikl->bo",
-                # (num_batches:b, in_channels:i, kernel_height:k, kernel_width:l)
-                windows[:, :, -1, -1],
-                # (out_channels:o, in_channels:i, kernel_size:k, kernel_size:l)
-                weights[:, :, :-y_pad_offset, :-x_pad_offset],
-                out=out[
-                    :,
-                    :,
-                    -(padding[0] - y_pad_offset + 1),
-                    -(padding[1] - x_pad_offset + 1),
-                ],
-                optimize=True,
-            )
 
     # Add biases
     if biases is not None:
