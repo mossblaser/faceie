@@ -40,21 +40,16 @@ from faceie.nn import (
     prelu,
 )
 
+from faceie.nn_arguments import (
+    LinearWeights,
+    Conv2DWeights,
+)
+
 
 MODEL_DATA_DIR = Path(__file__).parent / "data"
 """
 Directory containing precomputed model weights files.
 """
-
-
-class LinearWeights(NamedTuple):
-    weights: NDArray
-    biases: NDArray
-
-
-class Conv2DWeights(NamedTuple):
-    weights: NDArray
-    biases: NDArray
 
 
 class PNetWeights(NamedTuple):
