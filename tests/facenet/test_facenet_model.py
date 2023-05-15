@@ -10,7 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from faceie.scripts.convert_facenet_weights import extract_weights
-from faceie.mtcnn.detect_faces import image_to_array
+from faceie.image_to_array import image_to_array
 from faceie.facenet.model import FaceNetWeights, encode_face
 
 from facenet_pytorch.models.inception_resnet_v1 import InceptionResnetV1

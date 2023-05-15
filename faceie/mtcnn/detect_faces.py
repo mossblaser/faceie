@@ -13,6 +13,7 @@ from numpy.typing import NDArray
 
 from PIL import Image
 
+from faceie.image_to_array import image_to_array
 from faceie.mtcnn.pyramid import ImagePyramid
 from faceie.mtcnn.model import p_net, r_net, o_net
 from faceie.mtcnn.non_maximum_suppression import non_maximum_suppression
@@ -149,23 +150,6 @@ def resolve_coordinates(
     coordinate_pairs[:, 1::2] += np.expand_dims(input_bounding_boxes[:, 1], -1)
 
     return coordinate_pairs
-
-
-def image_to_array(image: Image.Image) -> NDArray:
-    """
-    Convert an 8-bit RGB PIL image into a float32 Numpy array with shape (3,
-    height, width) and valuesin the range -1 to +1.
-    """
-    out = np.asarray(image).astype(np.float32)
-
-    # Rescale
-    out -= 127.5
-    out /= 128.0
-
-    # Move channels to front
-    out = np.moveaxis(out, 2, 0)
-
-    return out
 
 
 def get_proposals(

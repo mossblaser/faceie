@@ -8,8 +8,9 @@ import numpy as np
 
 import torch
 
+from faceie.image_to_array import image_to_array
 from faceie.mtcnn.model import p_net, r_net, o_net
-from faceie.mtcnn.detect_faces import resolve_p_net_bounding_boxes, image_to_array
+from faceie.mtcnn.detect_faces import resolve_p_net_bounding_boxes
 
 import facenet_pytorch.models.mtcnn  # type: ignore
 
