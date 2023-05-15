@@ -2,10 +2,14 @@
 Numpy based implementations of the main Inception-ResNet-v1/FaceNet model components.
 """
 
-from typing import NamedTuple
+from typing import NamedTuple, Iterable
+
+from PIL import Image
 
 import numpy as np
 from numpy.typing import NDArray
+
+from faceie.image_to_array import image_to_array
 
 from faceie.nn import (
     linear,
@@ -605,7 +609,7 @@ def inception_resnet_c(
     return output
 
 
-def encode_face(img: NDArray, weights: FaceNetWeights) -> NDArray:
+def encode_face(image: Iterable[Image.Image] | Image.Image, weights: FaceNetWeights) -> NDArray:
     """
     Produce the embeddings for a face, or series of faces.
 
@@ -615,9 +619,8 @@ def encode_face(img: NDArray, weights: FaceNetWeights) -> NDArray:
 
     Parameters
     ==========
-    img : (3, height, width) or (num_batches, 3, height, width)
-        The face images (as processed by :py:func:`image_to_array`) where all
-        values lie in the range -1.0 to +1.0.
+    image : Image, [Image, ...]
+        The face image or images.
 
         According to the Inception-ResNet-v1 paper, images should be 299x299
         pixels however FaceNet-PyTorch (which this implementation uses weights
@@ -631,12 +634,18 @@ def encode_face(img: NDArray, weights: FaceNetWeights) -> NDArray:
         A 512 dimensional embedding of the face or faces provided (depending on
         the shape of the input image.
     """
+    # Convert input to images
+    if isinstance(image, Image.Image):
+        x = image_to_array(image)
+    else:
+        x = np.stack(list(map(image_to_array, image)))
+    
     # Force to (num_batches, 3, height, width)
-    batched = img.ndim == 4
+    batched = x.ndim == 4
     if not batched:
-        img = img.reshape(1, *img.shape)
+        x = x.reshape(1, *x.shape)
 
-    x = stem(img, weights.stem)
+    x = stem(x, weights.stem)
 
     for w in weights.inception_resnet_a:
         x = inception_resnet_a(x, w)

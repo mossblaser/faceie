@@ -9,8 +9,8 @@ import torch
 import numpy as np
 from numpy.typing import NDArray
 
-from faceie.scripts.convert_facenet_weights import extract_weights
 from faceie.image_to_array import image_to_array
+from faceie.scripts.convert_facenet_weights import extract_weights
 from faceie.facenet.model import FaceNetWeights, encode_face
 
 from facenet_pytorch.models.inception_resnet_v1 import InceptionResnetV1
@@ -33,32 +33,30 @@ def weights(facenet_pytorch_model: InceptionResnetV1) -> FaceNetWeights:
 def test_same_output(
     facenet_pytorch_model: InceptionResnetV1, weights: FaceNetWeights
 ) -> None:
-    img = image_to_array(Image.open(TEST_IMAGE_DIR / "jonathan_1.jpg"))
+    image = Image.open(TEST_IMAGE_DIR / "jonathan_1.jpg")
 
-    out = encode_face(img, weights)
-    exp = facenet_pytorch_model(torch.tensor(img).unsqueeze(0)).detach().numpy()
+    out = encode_face(image, weights)
+    exp = facenet_pytorch_model(torch.tensor(image_to_array(image)).unsqueeze(0)).detach().numpy()
 
     assert np.allclose(out, exp, atol=1e-5)
 
 
 def test_appears_to_work(weights: FaceNetWeights) -> None:
-    imgs = np.stack(
-        [
-            image_to_array(Image.open(TEST_IMAGE_DIR / name))
-            for name in [
-                "jonathan_1.jpg",
-                "jonathan_2.jpg",
-                "dara_1.jpg",
-                "dara_2.jpg",
-            ]
+    images = [
+        Image.open(TEST_IMAGE_DIR / name)
+        for name in [
+            "jonathan_1.jpg",
+            "jonathan_2.jpg",
+            "dara_1.jpg",
+            "dara_2.jpg",
         ]
-    )
+    ]
 
-    encodings = encode_face(imgs, weights)
+    encodings = encode_face(images, weights)
 
-    for a in range(imgs.shape[0]):
+    for a in range(len(images)):
         person_a = a // 2
-        for b in range(imgs.shape[0]):
+        for b in range(len(images)):
             person_b = b // 2
 
             score = np.sqrt(np.sum((encodings[a] - encodings[b]) ** 2))
