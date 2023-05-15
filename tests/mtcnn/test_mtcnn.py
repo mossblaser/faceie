@@ -65,7 +65,7 @@ def test_centers_to_square_bounding_boxes() -> None:
     )
 
     assert np.array_equal(
-        centers_to_square_bounding_boxes(ar, 2),
+        centers_to_square_bounding_boxes(ar, np.array(2)),
         np.array(
             [
                 [1, 2, 3, 4],
@@ -176,7 +176,7 @@ def test_detect_faces_multiple_orientations(extract_images: int | None) -> None:
     im = Image.open(TEST_IMAGE_DIR / "faces_at_angles.jpg")
     out = detect_faces(
         im,
-        rotations=[-np.pi / 2, -np.pi / 4, 0.0, np.pi / 4, np.pi / 2],
+        rotations=np.array([-np.pi / 2, -np.pi / 4, 0.0, np.pi / 4, np.pi / 2]),
         extract_images=extract_images,
     )
 
@@ -213,5 +213,6 @@ def test_detect_faces_multiple_orientations(extract_images: int | None) -> None:
     if extract_images is None:
         assert out.images is None
     else:
+        assert out.images is not None
         for image in out.images:
             assert image.size == (extract_images, extract_images)

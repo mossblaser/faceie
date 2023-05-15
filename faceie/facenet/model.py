@@ -475,7 +475,7 @@ def inception_resnet_b(x: NDArray, weights: InceptionResNetBWeights) -> NDArray:
     return output
 
 
-def reduction_b(x: NDArray, weights: ReductionAWeights) -> NDArray:
+def reduction_b(x: NDArray, weights: ReductionBWeights) -> NDArray:
     """
     Implements the Reduction-B module as described by figure 12 of the
     Inception ResNet paper.
@@ -550,7 +550,7 @@ def reduction_b(x: NDArray, weights: ReductionAWeights) -> NDArray:
 
 
 def inception_resnet_c(
-    x: NDArray, weights: InceptionResNetBWeights, skip_relu: bool = False
+    x: NDArray, weights: InceptionResNetCWeights, skip_relu: bool = False
 ) -> NDArray:
     """
     Implements the Inception-ResNet-C module as described by figure 13 of the
@@ -609,7 +609,9 @@ def inception_resnet_c(
     return output
 
 
-def encode_face(image: Iterable[Image.Image] | Image.Image, weights: FaceNetWeights) -> NDArray:
+def encode_face(
+    image: Iterable[Image.Image] | Image.Image, weights: FaceNetWeights
+) -> NDArray:
     """
     Produce the embeddings for a face, or series of faces.
 
@@ -639,7 +641,7 @@ def encode_face(image: Iterable[Image.Image] | Image.Image, weights: FaceNetWeig
         x = image_to_array(image)
     else:
         x = np.stack(list(map(image_to_array, image)))
-    
+
     # Force to (num_batches, 3, height, width)
     batched = x.ndim == 4
     if not batched:
@@ -647,21 +649,21 @@ def encode_face(image: Iterable[Image.Image] | Image.Image, weights: FaceNetWeig
 
     x = stem(x, weights.stem)
 
-    for w in weights.inception_resnet_a:
-        x = inception_resnet_a(x, w)
+    for wa in weights.inception_resnet_a:
+        x = inception_resnet_a(x, wa)
 
     x = reduction_a(x, weights.reduction_a)
 
-    for w in weights.inception_resnet_b:
-        x = inception_resnet_b(x, w)
+    for wb in weights.inception_resnet_b:
+        x = inception_resnet_b(x, wb)
 
     x = reduction_b(x, weights.reduction_b)
 
     # This implementation diverges from the Inception-ResNet-v1 paper at this
     # point in having an extra Inception-ResNet-C module without the ReLU stage
     # appended.
-    for w in weights.inception_resnet_c[:-1]:
-        x = inception_resnet_c(x, w)
+    for wc in weights.inception_resnet_c[:-1]:
+        x = inception_resnet_c(x, wc)
     x = inception_resnet_c(x, weights.inception_resnet_c[-1], skip_relu=True)
 
     # "Adaptive average pooling" (or just taking the mean of all pixel values

@@ -42,7 +42,7 @@ def n(tensor: torch.Tensor) -> NDArray:
 
 
 def extract_convolutional_unit_weights(
-    unit: torch.nn.Module,  # facenet_pytorch.models.inception_resnet_v1.BasicConv2d
+    unit: Any,  # facenet_pytorch.models.inception_resnet_v1.BasicConv2d
 ) -> ConvolutionalUnitWeights:
     return ConvolutionalUnitWeights(
         kernel=n(unit.conv.weight),
@@ -59,6 +59,7 @@ def extract_convolutional_unit_weights(
 
 
 def extract_convolution_weights(unit: torch.nn.Conv2d) -> Conv2DWeights:
+    assert unit.bias is not None
     return Conv2DWeights(
         weights=n(unit.weight),
         biases=n(unit.bias),
@@ -66,7 +67,7 @@ def extract_convolution_weights(unit: torch.nn.Conv2d) -> Conv2DWeights:
 
 
 def extract_weights(
-    model: torch.nn.Module,  # facenet_pytorch.models.inception_resnet_v1.InceptionResnetV1
+    model: Any,  # facenet_pytorch.models.inception_resnet_v1.InceptionResnetV1
 ) -> FaceNetWeights:
     return FaceNetWeights(
         stem=StemWeights(

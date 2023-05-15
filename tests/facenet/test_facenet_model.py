@@ -13,7 +13,7 @@ from faceie.image_to_array import image_to_array
 from faceie.scripts.convert_facenet_weights import extract_weights
 from faceie.facenet.model import FaceNetWeights, encode_face
 
-from facenet_pytorch.models.inception_resnet_v1 import InceptionResnetV1
+from facenet_pytorch.models.inception_resnet_v1 import InceptionResnetV1  # type: ignore
 
 
 TEST_IMAGE_DIR = Path(__file__).parent
@@ -36,7 +36,11 @@ def test_same_output(
     image = Image.open(TEST_IMAGE_DIR / "jonathan_1.jpg")
 
     out = encode_face(image, weights)
-    exp = facenet_pytorch_model(torch.tensor(image_to_array(image)).unsqueeze(0)).detach().numpy()
+    exp = (
+        facenet_pytorch_model(torch.tensor(image_to_array(image)).unsqueeze(0))
+        .detach()
+        .numpy()
+    )
 
     assert np.allclose(out, exp, atol=1e-5)
 
