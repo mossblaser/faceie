@@ -30,3 +30,5 @@ FaceNet-PyTorch eventually re-implemented and so to what this module
 reimplements using Numpy. Inception indeed.
 
 """
+
+from faceie.facenet.model import encode_face, FaceNetWeights, load

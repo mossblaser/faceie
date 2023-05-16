@@ -14,7 +14,7 @@ from numpy.typing import NDArray
 
 from itertools import count
 
-import pickle
+import weightie
 
 from faceie.nn_arguments import (
     LinearWeights,
@@ -256,4 +256,4 @@ def main():
     weights = extract_weights(StateDictAsObjects(state_dict))
 
     with open(args.output, "wb") as f:
-        pickle.dump(weights, f)
+        weightie.dump(weights, f)

@@ -2,12 +2,20 @@
 Numpy based implementations of the main Inception-ResNet-v1/FaceNet model components.
 """
 
-from typing import NamedTuple, Iterable
+from typing import NamedTuple, Iterable, Callable
 
 from PIL import Image
 
 import numpy as np
 from numpy.typing import NDArray
+
+from pathlib import Path
+
+from functools import lru_cache
+
+import weightie
+
+from faceie import __version__
 
 from faceie.image_to_array import image_to_array
 
@@ -160,6 +168,71 @@ class FaceNetWeights(NamedTuple):
 
     output_dimension_reduction: LinearWeights
     output_batch_normalisation: BatchNormalisationWeights
+
+
+# NB: This cache means that when load is called repeatedly and automatically by
+# the encode function below it will not actually require us to re-load the
+# weights file.
+#
+# NB: since the returned data is mmaped anyway we don't need to worry too much
+# about keeping the weights loaded beyond their useful lifetime as the OS can
+# swap them out if they're getting in the way anyway.
+@lru_cache(maxsize=1)
+def load(
+    source: Path | str = "20180402-114759-vggface2.weights",
+    search_paths: list[Path] | None = None,
+    update: bool = False,
+    progress_callback: Callable[[list[str], str, int, int | None], None]
+    | None = weightie.downloader.print_status,
+    min_callback_interval: float = 0.5,
+) -> FaceNetWeights:
+    """
+    Load a set of weights from a file (if a Path is given) or automatically
+    download a named weights file from the GitHub release (if a string is
+    given).
+
+    Parameters
+    ==========
+    source : local weights file (Path) or GitHub asset filename (str)
+        The weights to be downloaded.
+    search_paths : [Path, ...] or None
+        When the source is a GitHub asset filename, a list of locations to
+        search for weights locally before resorting to downloading the file. If
+        None is given, will search platform-specific data directories.
+
+        When downloading weights, the first item on the search path (by default
+        the user application data directory) will be used to store the
+        downloaded weights.
+    update : bool
+        If True, force a check for new weights to download.
+    progress_callback : f(list_of_files, file, bytes_downloaded, bytes_total) or None
+        During file downloads this will be called every min_callback_interval
+        seconds with the status of the download. By default this will print
+        status to stderr. Disable by passing None.
+    min_callback_interval : float
+        See progress_callback.
+
+    Returns
+    =======
+    Weights
+        The model weights.
+
+        Loaded weights are memory mmapped meaning that the data will not
+        actually be read from disk until it is used and may be freely swapped
+        out of RAM by the OS when needed if they're not being used.
+    """
+    if isinstance(source, str):
+        source = weightie.download(
+            repository="mossblaser/faceie",
+            asset_filenames=[source],
+            target_version=__version__,
+            search_paths=search_paths,
+            update=update,
+            progress_callback=progress_callback,
+            min_callback_interval=min_callback_interval,
+        )[source]
+
+    return weightie.load(source.open("rb"))
 
 
 def convolutional_unit(
@@ -610,7 +683,8 @@ def inception_resnet_c(
 
 
 def encode_face(
-    image: Iterable[Image.Image] | Image.Image, weights: FaceNetWeights
+    image: Iterable[Image.Image] | Image.Image,
+    weights: FaceNetWeights | None = None
 ) -> NDArray:
     """
     Produce the embeddings for a face, or series of faces.
@@ -626,9 +700,11 @@ def encode_face(
 
         According to the Inception-ResNet-v1 paper, images should be 299x299
         pixels however FaceNet-PyTorch (which this implementation uses weights
-        from) uses 160x160 images instead. As such, better results may be
-        obtained with the 160x160 images.
-    weights : FaceNetWeights
+        from) was trained on 160x160 images. As such, better results may be
+        expected with the 160x160 images.
+    weights : FaceNetWeights or None
+        If None, a default set of weights will be downloaded using
+        :py:func:`load`.
 
     Returns
     =======
@@ -636,6 +712,9 @@ def encode_face(
         A 512 dimensional embedding of the face or faces provided (depending on
         the shape of the input image.
     """
+    if weights is None:
+        weights = load()
+    
     # Convert input to images
     if isinstance(image, Image.Image):
         x = image_to_array(image)

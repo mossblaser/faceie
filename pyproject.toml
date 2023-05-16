@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "faceie"
-version = "0.0.1"
 license = {file= "LICENSE"}
 dependencies = [
     "numpy",
     "pillow",
+    "weightie >= 0.0.1, < 1.0.0",
 ]
+dynamic = ["version"]
 
 [project.optional-dependencies]
 convert = [
@@ -23,6 +24,9 @@ faceie-convert-facenet-weights = "faceie.scripts.convert_facenet_weights:main"
 
 [tool.setuptools]
 include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {attr = "faceie.__version__"}
 
 [tool.mypy]
 plugins = "numpy.typing.mypy_plugin"
