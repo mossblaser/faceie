@@ -682,7 +682,7 @@ def inception_resnet_c(
     return output
 
 
-def encode_face(
+def encode_faces(
     image: Iterable[Image.Image] | Image.Image,
     weights: FaceNetWeights | None = None
 ) -> NDArray:

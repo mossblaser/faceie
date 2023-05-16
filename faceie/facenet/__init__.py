@@ -31,4 +31,4 @@ reimplements using Numpy. Inception indeed.
 
 """
 
-from faceie.facenet.model import encode_face, FaceNetWeights, load
+from faceie.facenet.model import encode_faces, FaceNetWeights, load

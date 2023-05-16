@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 
 from faceie.image_to_array import image_to_array
 from faceie.scripts.convert_facenet_weights import extract_weights
-from faceie.facenet.model import FaceNetWeights, encode_face
+from faceie.facenet.model import FaceNetWeights, encode_faces
 
 from facenet_pytorch.models.inception_resnet_v1 import InceptionResnetV1  # type: ignore
 
@@ -35,7 +35,7 @@ def test_same_output(
 ) -> None:
     image = Image.open(TEST_IMAGE_DIR / "jonathan_1.jpg")
 
-    out = encode_face(image, weights)
+    out = encode_faces(image, weights)
     exp = (
         facenet_pytorch_model(torch.tensor(image_to_array(image)).unsqueeze(0))
         .detach()
@@ -56,7 +56,7 @@ def test_appears_to_work(weights: FaceNetWeights) -> None:
         ]
     ]
 
-    encodings = encode_face(images, weights)
+    encodings = encode_faces(images, weights)
 
     for a in range(len(images)):
         person_a = a // 2
