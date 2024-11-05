@@ -4,6 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "faceie"
+description = "An pure Numpy implementation of MTCNN face detection and an Inception-ResNet-v1 based FaceNet-style face encoder."
+readme = "README.md"
 license = {file= "LICENSE"}
 dependencies = [
     "numpy",
@@ -11,6 +13,9 @@ dependencies = [
     "weightie >= 0.0.1, < 1.0.0",
 ]
 dynamic = ["version"]
+
+[project.urls]
+source = "https://github.com/mossblaser/faceie"
 
 [project.optional-dependencies]
 convert = [
