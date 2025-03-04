@@ -182,8 +182,8 @@ def get_proposals(
 
     # Flatten
     shape = probs.shape
-    probs = probs.reshape(np.product(shape))
-    bboxes = bboxes.reshape(np.product(shape), 4)
+    probs = probs.reshape(np.prod(shape))
+    bboxes = bboxes.reshape(np.prod(shape), 4)
 
     # Select only candidates with sufficiently high probability
     above_threshold = probs > probability_threshold
